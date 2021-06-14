@@ -1,0 +1,19 @@
+{
+  "name": "verity",
+  "version": "1.0.0",
+  "description": "",
+  "main": "verity_backchannel.js",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "express": "^4.17.1",
+    "fs": "^0.0.1-security",
+    "minimist": "^1.2.5",
+    "verity-sdk": "^0.4.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}

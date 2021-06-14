@@ -1,0 +1,19 @@
+{
+    "APP": {
+        "LISTENING_PORT": 3000,
+        "WEBHOOK_PORT": 8000,
+        "VERITY_URL": "https://vas.pps.evernym.com/",
+        "PROVISION_TOKEN": {
+            "sponseeId": "C64", 
+            "sponsorId": "evernym-demo-sponsor",
+            "nonce": "r4I673qLc7M276awjctIHlPupUG6jcls", 
+            "timestamp": "2021-03-26T16:45:04.965093", 
+            "sig": "OoZpWYdm2UbLHdB3Pt6gNKiJvevQtLSWK5MFlh1Ult3UdqemTsmYbaUoH09IRo38iYeVr3odlqj1eCagc52sBQ==", 
+            "sponsorVerKey": "BCHo16QAdnZtPxaEjGBPQEiohxF62LR3qVwce298g7Jf"
+        }
+    },
+    "WALLET": {
+        "NAME": "TestWallet",
+        "KEY": "TestWallet1Key"
+    }
+}
