@@ -159,7 +159,7 @@ def step_impl(context, invitee):
     invitee_url = context.config.userdata.get(invitee)
     invitee_connection_id = context.connection_id_dict[invitee][context.inviter_name]
 
-    # invitee already recieved the connection response in the accept-request call so get connection and verify status=responded.
+    # invitee already recieved the connection response in the accept-request call so get and verify status=responded.
     assert expected_agent_state(invitee_url, "connection", invitee_connection_id, "responded")
 
 @given('"{invitee}" sends a connection request to "{inviter}"')

@@ -2,11 +2,9 @@
 const minimist = require("minimist");
 //Express
 const axios = require('axios')
-const bodyParser = require('body-parser')
 const express = require("express");
-const sdk = require('verity-sdk');
+const sdk = require('@evernym/verity-sdk');
 const shell = require('shelljs')
-const ngrok = require('ngrok');
 const base64url = require('base64url');
 
 const WALLET_NAME = `Wallet-${Math.floor(Math.random() * (999999 - 100000) + 100000)}`;
@@ -24,9 +22,6 @@ async function main() {
         },
     });
 
-    console.log('Environment Variables:')
-    console.log(process.env)
-
     const BACKCHANNEL_PORT = Number(cliArguments.port)
     const AGENT_PORT = BACKCHANNEL_PORT+1
     process.env.AGENT_PORT = AGENT_PORT
@@ -43,23 +38,24 @@ async function main() {
     }))
 
     function defaultHandler (message) {
-        console.log(`Unhandled message:${message}`)
+        console.log(`Unhandled message:`)
+        console.log(message)
     }
 
     const handlers = new sdk.Handlers()
     handlers.setDefaultHandler(defaultHandler)
     console.log('set default handler')
 
-    const connectionsMap = {}
+    const connectionsMap = new Map()
 
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async function attempt(func, attempts, params = []) {
+    async function attempt(func, attempts, param) {
         var i
         for(i = 0; i < attempts; i=i+1) {
-            var result = await func(params)
+            var result = await func(param)
             if(result != null) {
                 return result
             }
@@ -114,25 +110,26 @@ async function main() {
         switch (operation) {
             case 'create-invitation': 
                 result = await createInvitation()
-                console.log(`sending response: \n {"connection_id": \"${result[0]}\", \"state\": \"N/A\", \"invitation\": ${JSON.stringify(result[1])}}`)
                 res.status(200).send(`{"connection_id": \"${result[0]}\", \"state\": \"N/A\", \"invitation\": ${JSON.stringify(result[1])}}`)
                 break;
             case 'receive-invitation': 
-                result = await receiveInvitation(data)
-                console.log(`Mapping ${result[1]} to ${result[0]}`)
-                connectionsMap[result[0]] = result[1]
-                console.log(`sending response: \n {"state":"N/A"}`)
-                res.status(200).send(`{"state":"N/A", "connection_id": \"${result[0]}\"}`)
+                console.log('Verity does not support the Invitee Role')
+                res.status(501).send(`Verity does not support the Invitee role`)
                 break;
             case 'accept-invitation': 
-                result = await acceptInvitation(data, id)
-                res.status(501).send()
+                console.log('Verity does not support the Invitee Role')
+                res.status(501).send(`Verity does not support the Invitee Role`)
+                break;
+            case 'accept-request':
+                result = await acceptRequest(data, id)
+                res.status(200).send(`{"state":"${result[0]}", "connection_id": \"${result[1]}\"}`)
                 break;
             case 'send-ping':
-                res.status(501).send()
+                result = await sendPing(id);
+                res.status(200).send(`{"state":"${result[0]}", "connection_id": \"${result[1]}\"}`)
                 break;
-                // return await sendPing();
             default: 
+                console.log(`unimplemented operation: ${operation}`)
                 res.status(501).send()
                 break;
         }
@@ -141,9 +138,9 @@ async function main() {
     app.post('/agent/command/:topic/:operation', async function(req, res) {
         switch(req.params.topic) {
             case 'connection':
-                console.log(`Matched operation: ${req.params.operation}`)
+                console.log(`Matched operation: ${req.params.operation}, id: ${JSON.parse(req.body).id}`)
                 console.log(JSON.parse(req.body).data)
-                await handleConnectionPostOperation(req.params.operation, JSON.parse(req.body).data, res, req.body.id)
+                await handleConnectionPostOperation(req.params.operation, JSON.parse(req.body).data, res, JSON.parse(req.body).id)
                 break;
             default:
                 console.log(`Matched operation: ${req.params.operation}`)
@@ -167,8 +164,9 @@ async function main() {
                         resolve(message.did)
                         break
                     case relationship.msgNames.CONNECTION_INVITATION:
+                        console.log(message)
                         resolve(message.inviteURL)
-                        break
+                        break                        
                 }
             })
         })
@@ -178,8 +176,6 @@ async function main() {
         }
         await updateEndpoint()
         console.log("Backchannel webhook endpoint updated")
-
-        console.log("creating relationsip")
 
         let relDid
         relationship.create(context)
@@ -192,6 +188,7 @@ async function main() {
             handlers.addHandler(relationship.msgFamily, relationship.msgFamilyVersion, async (msgName, message) => {
                 switch(msgName) {
                     case relationship.msgNames.INVITATION:
+                        console.log("Relationship Invitation:")
                         console.log(message)
                         resolve(message.inviteURL)
                         break
@@ -200,105 +197,124 @@ async function main() {
         })
 
         await relationship.connectionInvitation(context)
-        let invitation
+        let invitationUrl
         await createInvitation.then((value) => {
-            invitation = value
+            invitationUrl = value
         })
+
+        const invitation = base64url.decode(invitationUrl.split('c_i=')[1])
 
         console.log(`Invitation created`)
         console.log(invitation)
 
+        const connection = new sdk.protocols.v1_0.Connecting(relDid, "label", invitationUrl)
+
+        console.log(`Mapping connection promise to: ${relDid}`)
+        connectionsMap.set(relDid, new Promise((resolve) => {
+            handlers.addHandler(connection.msgFamily, connection.msgFamilyVersion, async (msgName, message) => {
+                switch(msgName) {
+                    case 'request-received':
+                        console.log(message) 
+                        break;
+                    case 'response-sent':
+                        console.log(message)
+                        resolve(true)
+                        break
+                    default:
+                        console.log(message)
+                        resolve(false)
+                        break
+                }
+            })
+        }))
+
         return [relDid, invitation]
     }
 
-    async function receiveInvitation(data) {
-        console.log(`Recieved invitation: ${JSON.stringify(data)}`)
-        const relationship = new sdk.protocols.v1_0.Relationship()
-        const relationshipKeys = new Promise((resolve) => {
-            handlers.addHandler(relationship.msgFamily, relationship.msgFamilyVersion, async (msgName, message) => {
-                switch(msgName) {
-                    case relationship.msgNames.CREATED:
-                        console.log(message)
-                        var relDID = message.did
-                        resolve(relDID)
-                        break
-                    case relationship.msgNames.CONNECTION_INVITATION:
-                        resolve(message.inviteURL)
-                }
+    async function acceptRequest(data, id) {
+        console.log(`Accepting Connection Request with id: ${id}`)
+        console.log(typeof connectionsMap.get(id))
+        if(connectionsMap.get(id) != null) {
+            let result
+            await connectionsMap.get(id).then((value) => {
+                result = value
             })
-        })
-        await relationship.create(context)
-        console.log('relationship created')
-        let relDid
-        await relationshipKeys.then((result) => {
-            relDid = result
-        })
-
-        const inviteUrl = `${VERITY_URL}:${AGENT_PORT}/agency/msg?c_i=${base64url.encode(JSON.stringify(data))}`
-        console.log(`Generated Invite Url: ${inviteUrl}`)
-        await axios.get(inviteUrl, {timeout: 2}).then((response) => {
-            console.log("Retrieved data from invite url:")
-            console.log(response.data)
-        }).catch((error) => {
-            console.log(`Error retrieving invite from inviteUrl`)
-        })
-        return [relDid, inviteUrl]
-    }
-
-    async function acceptInvitation(data, connection_id=null) {
-        console.log(`Accepting invitation request, data parameter: ${data}`)
-        const invitation = connectionsMap[connection_id]
-        const connectionProtocol = new sdk.protocols.v1_0.Connecting(connection_id, "label", invitation)
-        const connection = new Promise((resolve) => {
-            handlers.addHandler(connectionProtocol.msgFamily, connectionProtocol.msgFamilyVersion, async (msgName, message) => {
-                switch(msgName) {
-                    case 'accept':
-                        console.log(message)
-                        break;
-                    default: 
-                        console.log(message)
-                        break;
-                }
+            if(result) {   
+                connectionsMap.set(id, new Promise((resolve) => {
+                    handlers.addHandler('trust_ping', '1.0', async function(msgName, message) {
+                        switch(msgName) {
+                            case 'sent-response': 
+                                console.log(message)
+                                resolve(true)
+                                break;
+                            case 'default':
+                                console.log(message)
+                                resolve(false)
+                                break;
+                        }
+                    })
+                }))
                 
-            })
-        })
-        await connectionProtocol.accept(context)
-        await connection
+                console.log(`Returning [\'N/A\', ${id}]`)
+                return ['N/A', id]
+            } 
+            return ['Error', id]
+        }
+        console.log('Unable to retrieve connection promise')
+        console.log(connectionsMap.get(id))
+        
+        return ['Error', id]
     }
 
     async function handleConnectionGetOperation(id=null) {
-        // TODO: See if there's a way to get the status of a specific verity agent. Might not be practical
-
+        // Connection state in verity protocols doesn't line up with expected states in AATH
+        // Verity backchannel will not proceed if it doesn't recieve proper signal messages,
+        // this will have to suffice as an inferred state 
         if(id != null) {
             return "N/A"
         }
         return "N/A"
     }
 
+    async function sendPing(id) {
+        let result
+        setTimeout(async () => {
+            await connectionsMap.get(id).then((value) => {
+            result = value
+            })
+        }, 3000)
+
+        if(result) {
+            return ['complete', id]
+        }
+
+        return ['error', id]
+    }
+
 
     app.get('/agent/command/:topic', async function(req, res) {
         switch(req.params.topic) {
             case 'connection': 
-                console.log(`Matched operaiton: ${req.params.topic}`)
+                console.log(`Matched topic: ${req.params.topic}`)
                 result = await handleConnectionGetOperation()
                 res.status(200).send(`"state":"${result}"}`)
                 break;
             case 'status':
-                console.log(`Matched operaiton: ${req.params.topic}`)
-                var url = await attempt(getVerityUrl, 10)
-                var status = await attempt(checkVerity, 1, [url])
+                console.log(`Matched topic: ${req.params.topic}`)
+                var url = await getVerityUrl()
+                var status = await checkVerity(url)
                 if(status != null) {
                     res.status(200).send()
                 }
                 res.status(404).send()
                 break;
             case 'version':
-                console.log(`Matched operaiton: ${req.params.topic}`)
+                console.log(`Matched topic: ${req.params.topic}`)
                 res.status(200).send("1.0")
                 break;
             default:
-                console.log(`Unimplemented operation: ${req.params.topic}`)
-                res.status(501).send()
+                console.log(`Unimplemented topic: ${req.params.topic}`)
+                res.status(501).send('Verity ackchannel has not implemented this topic')
 
         }
     })
@@ -306,15 +322,13 @@ async function main() {
     app.get('/agent/command/:topic/:id', async function(req, res) {
         switch(req.params.topic) {
             case 'connection': 
-                console.log(`Matched operaiton: ${req.params.topic}, ${req.params.id}`)
+                console.log(`Matched topic with id: ${req.params.topic}, ${req.params.id}`)
                 const result = await handleConnectionGetOperation(req.params.id)
                 res.status(200).send(`{"state":"${result}"}`)
         }
     })
 
     app.post('/webhook', async function(req, res) {
-        console.log(`webhook recieved request:`)
-        console.log(req.body)
         await handlers.handleMessage(context, Buffer.from(req.body, 'utf8'))
         res.status(200).send(`success`)
     });

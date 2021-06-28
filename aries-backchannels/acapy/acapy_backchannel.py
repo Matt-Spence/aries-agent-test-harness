@@ -382,6 +382,9 @@ class AcaPyAgentBackchannel(AgentBackchannel):
         ) as resp:
             resp_status = resp.status
             resp_text = await resp.text()
+            print('Admin request response: ')
+            print(resp_status)
+            print(resp_text)
             return (resp_status, resp_text)
 
     async def admin_GET(self, path, text=False, params=None) -> (int, str):

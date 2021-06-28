@@ -147,7 +147,7 @@ start_verity() {
   echo
 
   # Start Verity Application
-  /usr/bin/java -cp /etc/verity/verity-application:.m2/repository/org/fusesource/leveldbjni/leveldbjni-all/1.8/leveldbjni-all-1.8.jar:/usr/lib/verity-application/verity-application-assembly.jar \
+  /usr/bin/java -cp /etc/verity/verity-application:.m2/repository/org/fusesource/leveldbjni/leveldbjni-all/1.8/leveldbjni-all-1.8.jar:./verity-assembly-0.4.0-SNAPSHOT.jar \
   com.evernym.verity.Main &
 
   echo

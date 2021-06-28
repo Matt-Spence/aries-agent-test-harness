@@ -201,12 +201,16 @@ class AgentBackchannel:
         """
         data = None
         if payload:
+            print('Payload: ')
+            print(payload)
             if "id" in payload:
                 rec_id = payload["id"]
             if "cred_ex_id" in payload:
                 rec_id = payload["cred_ex_id"]
             if "data" in payload:
                 data = payload["data"]
+                print('Payload data: ')
+                print(data)
         for op in self.operations:
             if operation is not None:
                 if (op["topic"] == topic and op["method"] == method and

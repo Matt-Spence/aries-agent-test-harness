@@ -313,10 +313,7 @@ pingAgent(){
   port=${2}
 
   # ping agent using a backchannel-exposed api
-  rtnCd=$(curl -s --write-out '%{http_code}' http://localhost:${port}/agent/command/status/)
-  echo
-  echo $rtnCd
-  echo
+  rtnCd=$(curl -s --write-out '%{http_code}' --output /dev/null http://localhost:${port}/agent/command/status/)
   if (( ${rtnCd} == 200 )); then
     return 0
   else

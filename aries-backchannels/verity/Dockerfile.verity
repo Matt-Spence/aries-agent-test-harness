@@ -16,10 +16,14 @@ ADD verity/verity_config/ verity_config/
 ADD verity/package.json package.json
 ADD verity/package-lock.json package-lock.json
 
+ADD verity/package/ package/
+
 RUN npm install -g npm@5.6.0
 RUN npm install
 
 ADD verity/entrypoint.sh entrypoint.sh
+
+ADD verity/verity-assembly-0.4.0-SNAPSHOT.jar verity-assembly-0.4.0-SNAPSHOT.jar
 
 RUN ls -la
 

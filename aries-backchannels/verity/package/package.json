@@ -1,0 +1,41 @@
+{
+  "name": "@evernym/verity-sdk",
+  "author": "Evernym, Inc. <dev@evernym.com>",
+  "version": "0.4.9-54896217",
+  "description": "The official Node.js SDK for Evernym's Verity",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:evernym/verity-sdk.git"
+  },
+  "license": "Apache-2.0",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "mocha",
+    "lint": "standard",
+    "lint-fix": "standard --fix",
+    "package": "version=\"$(cat package.json | jq -r .version)\"; npm pack && mv evernym-verity-sdk-$version.tgz evernym-verity-sdk_$version.tgz",
+    "doc-build": "./node_modules/.bin/jsdoc src -r -c doc/conf.json -d doc/_build"
+  },
+  "keywords": [
+    "ssi",
+    "verity",
+    "evernym"
+  ],
+  "devDependencies": {
+    "body-parser": "^1.19.0",
+    "chai": "^4.3.4",
+    "chai-as-promised": "^7.1.1",
+    "cli-spinner": "^0.2.10",
+    "express": "^4.17.1",
+    "jsdoc": "^3.6.7",
+    "mocha": "^9.0.0",
+    "qrcode": "^1.4.4",
+    "standard": "^16.0.3"
+  },
+  "dependencies": {
+    "bs58": "^4.0.1",
+    "indy-sdk": "^1.16.0",
+    "request-promise-native": "^1.0.9",
+    "uuid": "^8.3.2"
+  }
+}
